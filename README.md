@@ -11,18 +11,22 @@ But if that's all it did, it would be pretty boring. And probably one character
 too many ... `alias k=kubectl`.
 
 Instead, `kc` allows you to easily incorporate the power of Bash to provide
-further functionality and reductions just writing specially named Bash
+further functionality and reductions by just writing specially named Bash
 functions.
 
-It includes a set of default functions, primarily based on the "discovery"
+It also includes a set of default functions, primarily based on the "discovery"
 sections of the official Kubernetes [cheat
-sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#viewing-finding-resources)
+sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/#viewing-finding-resources),
+so hopefully those are useful.
 
 
 ## Installing
 
-curl https://TODO > install.sh; chmod +x install.sh
+```
+curl https://raw.githubusercontent.com/jar-o/kc/master/.kc > install.sh
+chmod +x install.sh
 ./install.sh
+```
 
 ## Using kc
 
@@ -71,7 +75,7 @@ $HOME/.kc_custom
 The `.kc` file contains all the default functions, and it's best not to modify
 that one, in case in the future you ever want to update `kc`. However, the
 `.kc_custom` file exists for user modifications. So to add a function, simply
-edit `.kc_custom` add a function prefixed by `kc-`, save, and source
+edit `.kc_custom` with your new function, prefixed by `kc-`, save, and source
 `$HOME/.kc`.
 
 E.g. to do the time-honored *Hello World* function, you'd add
@@ -85,7 +89,7 @@ function kc-helowrld {
 to `.kc_custom`, save, and then `source $HOME/.kc`. Now when you run `kc`
 you'll see `helowrld` under the `Custom functions available` section. Note that
 you don't invoke with the `kc-` prefix. That's just so the `kc` function can
-automatically discover your functions without any help from you.
+automatically discover your functions without any help from you. Just do `kc helowrld`.
 
 ## Overriding the kc default functions
 
@@ -107,8 +111,8 @@ executed instead of the default `kc-configmap`.
 
 While most `kc` invocations are typing savers compared to the equivalent
 `kubectl` command -- and that was part of the point of having a shortcut -- the
-other reason was the (Pareto
-principle)[https://en.wikipedia.org/wiki/Pareto_principle] and muscle memory.
+other reason was the [Pareto
+principle](https://en.wikipedia.org/wiki/Pareto_principle) and muscle memory.
 
 As with so many other things, I found that I use a subset of `kubectl`
 invocations far more than others (like the "discovery" ones), and while I want
