@@ -23,7 +23,7 @@ so hopefully those are useful.
 ## Installing
 
 ```
-curl https://raw.githubusercontent.com/jar-o/kc/master/.kc > install.sh
+curl https://raw.githubusercontent.com/jar-o/kc/master/install.sh > install.sh
 chmod +x install.sh
 ./install.sh
 ```
