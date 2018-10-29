@@ -1,0 +1,331 @@
+# This is a convenience wrapper to kubectl (and maybe at least compatible with
+# https://github.com/ahmetb/kubectl-aliases)
+
+# TODO base core functionality on https://kubernetes.io/docs/reference/kubectl/cheatsheet
+
+
+# The main function. Add any additional functions to this file and declare them
+# with a "kc-" prefix so they are discoverable.
+function kc {
+    # Normalize basic utilities between platforms  TODO keep?
+	normalize_cmds
+
+    # Discover functions declared with a "kc-" prefix. These will be defined
+    # below, or in the user declared functions file, ~/.kc_custom
+	funcs=$(declare -F | grep -e 'kc-\w*'| awk '{print $3}')
+
+    if [ -z "$1" ]; then
+        echo "A shortcut and utilty for custom wrapped functionality around kubectl."
+        echo "Usage: ${FUNCNAME[0]} <custom function> <params ...>|<straight kubectl params ...>"
+        echo
+        echo "Custom functions available:"
+        for func in $funcs; do 
+            func=$(echo $func | sed 's/kc-//')
+            printf "\t$func\n"
+        done;
+        echo "(If no function is matched above, params will be sent straight to kubectl.)"
+        return
+    fi
+
+    for func in $funcs; do 
+        param="kc-$1"
+        if [ "$param" = "$func" ]; then
+            shift
+            $func $@
+            return
+        fi
+    done;
+
+	kubectl $@
+}
+
+# Custom functions hence.
+
+# Output the configmap for a namespace or service
+function kc-configmap {
+	# Check params and provide help
+    if missing_params 1 $@; then
+        usage "<namespace> [service]" "mynamespace myservice"
+        return 
+    fi
+	# Dump the configmap for either the namespace or the service.
+    if [ -z "$2" ]; then
+        kubectl -n $1 get configmap -o yaml
+    else
+        if [ "$3" != "yaml" ]; then
+            fmt="$3"
+        fi
+        kubectl -n $1 get configmap $2 -o yaml
+    fi
+}
+
+
+function kc-context {
+	if [ -z "$1" ]; then
+		usage "[context to which to switch]"
+	else
+		kubectl config use-context "$1"
+	fi
+	
+    kubectl config get-contexts
+}
+
+function kc-namespaces {
+    ctx=$(kubectl config get-contexts | grep '*')
+    printf "Context:\n$ctx\n"
+    repeat_char ${#ctx}; echo
+    kubectl get namespaces
+}
+
+function kc-services {
+	if [ -z "$1" ]; then
+		usage "<namespace> [any other kubectl params]"; echo
+        echo "Missing namespace. Here's what's available:"; echo
+        kc-namespaces
+    else
+        ns=$1; shift
+        kubectl -n $ns get services $@
+    fi
+}
+
+function kc-deploys {
+	if [ -z "$1" ]; then
+		usage "<namespace> [any other kubectl params]"; echo
+        echo "Missing namespace. Here's what's available:"; echo
+        kc-namespaces
+    else
+        ns=$1; shift
+        kubectl -n $ns get deployments -o wide $@
+    fi
+}
+
+# List pods in a namespace matching a pattern
+function kc-pods {
+    if missing_params 1 $@; then
+		usage "<namespace> [pattern]" "mynamespace myservice"
+        return
+    fi
+    ns=$1
+    shift
+    if [ ! -z "$1" ]; then
+        # If the param starts with a hyphen, treat it as a kubectl option, not a
+        # pattern, and skip
+        if [[ ! "$1" =~ ^- ]]; then
+            pat=$1; shift
+            kubectl get pods --namespace=$ns -o wide $@ | grep -E "^NAME|$pat"
+            return
+        fi
+    fi
+    kubectl get pods --namespace=$ns -o wide $@
+}
+
+function kc-nodes {
+    if missing_params 1 $@; then
+		usage "<namespace> [any other kubectl param]"
+        return
+    fi
+    ns=$1
+    shift
+    kubectl get nodes --namespace=$ns -o wide $@
+}
+
+function kc-desc {
+    if missing_params 2 $@; then
+		usage "<namespace> <type> [resource]" "mynamespace pods mypod1 mypod2"
+        return
+    fi
+    ns=$1; shift
+    kubectl describe --namespace=$ns $@
+}
+
+function kc-events {
+    if missing_params 1 $@; then
+		usage "<namespace> [any other kubectl params]" "mynamespace -o yaml"
+        return
+    fi
+    ns=$1
+    shift
+    kubectl get events --namespace=$ns $@
+}
+
+function kc-ingress {
+    if missing_params 1 $@; then
+		usage "<namespace> [pattern]" "mynamespace myservice"
+        return
+    fi
+    ns="$1"; shift
+    if [ ! -z "$1" ]; then
+        kubectl get ingress --namespace=$ns | grep -E "^NAME|$1"
+        return
+    fi
+    kubectl get ingress --namespace=$ns
+}
+
+function kc-shell {
+    if missing_params 2 $@; then
+        usage "<namespace> <pod> [container]" "mynamespace mypod sqlproxy"
+        return
+    fi
+    if [ -z $3 ]; then
+        kubectl --namespace "$1" exec -it "$2" /bin/sh
+    else
+        kubectl --namespace "$1" -c "$3" exec -it "$2" /bin/sh
+    fi
+}
+
+function kc-copy {
+    if missing_params 3 $@; then
+        echo "Copies a file up to a container"
+        usage "<namespace> <pod> [container] <file>" "mynamespace mypod file.zip"
+        return
+    fi
+    fil=$(basename "$3")
+    pushd `dirname "$3"` > /dev/null
+    if [ ! -e $fil ]; then # 3rd param must be container
+        $c=$fil;
+        $fil=$(basename "$4")
+        pushd `dirname "$fil"` > /dev/null
+        echo "Copying $fil to $2 ..."
+        tar cz $fil | kubectl --namespace="$1" -c "$c" exec -i "$2" -- tar xz $fil
+    else 
+        echo "Copying $fil to $2 ..."
+        tar cz $fil | kubectl --namespace="$1" exec -i "$2" -- tar xz $fil
+    fi
+    popd
+}
+
+function kc-slogs {
+    if missing_params 2 $@; then
+        echo "Dumps the logs of all pods/containers in a service. (But honestly, you should"
+        echo "check out stern: https://github.com/wercker/stern)."; echo
+        usage "<namespace> <service> [since] [any other kubectl params]" "mynamespace myservice 20m"
+        return
+    fi
+    ns="$1"; shift
+    svc="$1"; shift
+    since=30m
+    if [ ! -z "$1" ]; then
+        since=$1
+        shift
+    fi
+    for pod in $(kubectl get pods --namespace=$ns | grep "$svc" | awk '{print $1}'); do
+        echo "# $pod"
+        kubectl logs --namespace=$ns $pod --all-containers --since $since $@
+    done
+}
+
+function kc-secrets {
+    if missing_params 1 $@; then
+        usage "<namespace> <secret store>" "mynamespace mysecrets"
+        return
+    fi
+    if [ -z "$2" ]; then
+        echo "Here are the available secret stores:"
+        kubectl get secrets -n $1
+        return
+    fi
+
+    for keyval in $(kubectl -n $1 get secret $2 -o \
+        go-template='{{ range $key, $value := .data }}{{$key}}"{{$value}}#{{end}}' | tr '#' "\n"
+    ); do
+
+        key=$(echo "$keyval" | tr '"' ' ' | awk '{print $1}')
+        val=$(echo "$keyval" | tr '"' ' ' | awk '{print $2}' | $cmd_base64)
+        echo "$key: $val"
+        echo
+    done
+}
+
+function kc-secret {
+    if missing_params 3 $@; then
+        echo "Fetch the value of a single secret from a service"
+        usage "<namespace> <service> <secret name>" "mynamespace myservice mysecret"
+        return
+    fi
+
+    val=$(kubectl -n $1 get secret $2 -o go-template="{{ .data.$3 }}" | $cmd_base64)
+    if [ $? != "0" ]; then
+        echo "-------------------"
+        echo "Incorrect key, perhaps? Here are current secrets for $2:"
+        echo
+        kc-secrets $1 $2
+    else
+        echo "$3: $val"
+    fi
+}
+
+function kc-secretcompare {
+    if missing_params 3 $@; then
+        echo "Compare secrets between a single service living in two namespaces"
+        usage "<secret name> <namespace1> <namespace2>" "mysecret staging prod"
+        return
+    fi
+    sym='<==>'
+    echo "$1: $2 $sym $3"
+    echo "--------------------------"
+    for key in $(
+        kubectl -n $2 get secret $1 -o \
+            go-template='{{ range $key, $value := .data }}{{$key}}"{{end}}' | tr '"' "\n"
+    ); do
+        a=$(kubectl -n $2 get secret $1 -o go-template="$(echo -ne "{{ index .data \x22${key}\x22 }}")" | $cmd_base64)
+        b=$(kubectl -n $3 get secret $1 -o go-template="$(echo -ne "{{ index .data \x22${key}\x22 }}")" | $cmd_base64)
+        if [ "$a" == "$b" ]; then
+            match=''
+            len=20
+        else
+            match='**MISMATCH** '
+            len=40
+        fi
+        echo "${match}${key}"
+        a=$(echo -n "$a" | tr "\n" ' ')
+        b=$(echo -n "$b" | tr "\n" ' ')
+        echo "${a:0:$len}   $sym   ${b:0:$len}"
+        echo
+    done;
+}
+
+# Fixup common variations between *nix style commands, as needed
+function normalize_cmds {
+	platform='unknown'
+	ustr=`uname`
+	if [[ "$ustr" == 'Darwin' ]]; then
+        cmd_base64='base64 -D'
+    else
+        cmd_base64='base64 -d'
+	fi
+}
+
+function repeat_char {
+    if [ -z "$2" ]; then
+        c='='
+    else
+        c="$2"
+    fi
+    for ((i=0; i<$1; i++)); do
+        echo -n $c
+    done
+}
+
+# Ensures that the number of params coming into the calling function are at least
+# the number specified ($1)
+function missing_params {
+    c=$1
+    shift
+	if [ "$c" -le "$#" ]; then
+        return 1 # false
+    else
+        return 0
+    fi
+}
+
+# Outputs a nice "usage" message for the calling function.
+function usage {
+    echo "Usage: ${FUNCNAME[1]} $1"
+    if [ ! -z "$2" ]; then # echo an example
+		echo "  e.g. ${FUNCNAME[1]} $2"
+    fi
+}
+
+# Load user functions, if any. NOTE any functions redefined in the below file
+# will overwrite the default by the same name above.
+[ -f ~/.kc_custom ] && source ~/.kc_custom
