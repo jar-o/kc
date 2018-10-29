@@ -2,11 +2,11 @@
 # with a "kc-" prefix so they are discoverable.
 function kc {
     # Normalize basic utilities between platforms  TODO keep?
-	normalize_cmds
+    normalize_cmds
 
     # Discover functions declared with a "kc-" prefix. These will be defined
     # below, or in the user declared functions file, ~/.kc_custom
-	funcs=$(declare -F | grep -e 'kc-\w*'| awk '{print $3}')
+    funcs=$(declare -F | grep -e 'kc-\w*'| awk '{print $3}')
 
     if [ -z "$1" ]; then
         echo "A shortcut and utilty for custom wrapped functionality around kubectl."
@@ -30,19 +30,19 @@ function kc {
         fi
     done;
 
-	kubectl $@
+    kubectl $@
 }
 
 # Custom functions hence.
 
 # Output the configmap for a namespace or service
 function kc-configmap {
-	# Check params and provide help
+    # Check params and provide help
     if missing_params 1 $@; then
         usage "<namespace> [service]" "mynamespace myservice"
         return 
     fi
-	# Dump the configmap for either the namespace or the service.
+    # Dump the configmap for either the namespace or the service.
     if [ -z "$2" ]; then
         kubectl -n $1 get configmap -o yaml
     else
@@ -55,12 +55,12 @@ function kc-configmap {
 
 
 function kc-context {
-	if [ -z "$1" ]; then
-		usage "[context to which to switch]"
-	else
-		kubectl config use-context "$1"
-	fi
-	
+    if [ -z "$1" ]; then
+        usage "[context to which to switch]"
+    else
+        kubectl config use-context "$1"
+    fi
+    
     kubectl config get-contexts
 }
 
@@ -72,8 +72,8 @@ function kc-namespaces {
 }
 
 function kc-services {
-	if [ -z "$1" ]; then
-		usage "<namespace> [any other kubectl params]"; echo
+    if [ -z "$1" ]; then
+        usage "<namespace> [any other kubectl params]"; echo
         echo "Missing namespace. Here's what's available:"; echo
         kc-namespaces
     else
@@ -83,8 +83,8 @@ function kc-services {
 }
 
 function kc-deploys {
-	if [ -z "$1" ]; then
-		usage "<namespace> [any other kubectl params]"; echo
+    if [ -z "$1" ]; then
+        usage "<namespace> [any other kubectl params]"; echo
         echo "Missing namespace. Here's what's available:"; echo
         kc-namespaces
     else
@@ -96,7 +96,7 @@ function kc-deploys {
 # List pods in a namespace matching a pattern
 function kc-pods {
     if missing_params 1 $@; then
-		usage "<namespace> [pattern]" "mynamespace myservice"
+        usage "<namespace> [pattern]" "mynamespace myservice"
         return
     fi
     ns=$1
@@ -115,7 +115,7 @@ function kc-pods {
 
 function kc-nodes {
     if missing_params 1 $@; then
-		usage "<namespace> [any other kubectl param]"
+        usage "<namespace> [any other kubectl param]"
         return
     fi
     ns=$1
@@ -125,7 +125,7 @@ function kc-nodes {
 
 function kc-desc {
     if missing_params 2 $@; then
-		usage "<namespace> <type> [resource]" "mynamespace pods mypod1 mypod2"
+        usage "<namespace> <type> [resource]" "mynamespace pods mypod1 mypod2"
         return
     fi
     ns=$1; shift
@@ -134,7 +134,7 @@ function kc-desc {
 
 function kc-events {
     if missing_params 1 $@; then
-		usage "<namespace> [any other kubectl params]" "mynamespace -o yaml"
+        usage "<namespace> [any other kubectl params]" "mynamespace -o yaml"
         return
     fi
     ns=$1
@@ -144,7 +144,7 @@ function kc-events {
 
 function kc-ingress {
     if missing_params 1 $@; then
-		usage "<namespace> [pattern]" "mynamespace myservice"
+        usage "<namespace> [pattern]" "mynamespace myservice"
         return
     fi
     ns="$1"; shift
@@ -280,13 +280,13 @@ function kc-secretcompare {
 
 # Fixup common variations between *nix style commands, as needed
 function normalize_cmds {
-	platform='unknown'
-	ustr=`uname`
-	if [[ "$ustr" == 'Darwin' ]]; then
+    platform='unknown'
+    ustr=`uname`
+    if [[ "$ustr" == 'Darwin' ]]; then
         cmd_base64='base64 -D'
     else
         cmd_base64='base64 -d'
-	fi
+    fi
 }
 
 function repeat_char {
@@ -305,7 +305,7 @@ function repeat_char {
 function missing_params {
     c=$1
     shift
-	if [ "$c" -le "$#" ]; then
+    if [ "$c" -le "$#" ]; then
         return 1 # false
     else
         return 0
@@ -316,7 +316,7 @@ function missing_params {
 function usage {
     echo "Usage: ${FUNCNAME[1]} $1"
     if [ ! -z "$2" ]; then # echo an example
-		echo "  e.g. ${FUNCNAME[1]} $2"
+        echo "  e.g. ${FUNCNAME[1]} $2"
     fi
 }
 
