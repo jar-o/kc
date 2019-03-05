@@ -114,11 +114,18 @@ function kc-pods {
         # pattern, and skip
         if [[ ! "$1" =~ ^- ]]; then
             pat=$1; shift
-            $kubectl_cmd get pods --namespace=$ns -o wide $@ | grep -E "^NAME|$pat"
+            res=$($kubectl_cmd get pods --namespace=$ns -o wide $@ | grep -E "^NAME|$pat")
+            hdr=$(echo "$res" | head -n 1)
+            res=$(echo "$res" | grep -v NAME | sort)
+            echo "$hdr"; echo "$res"
             return
         fi
     fi
-    $kubectl_cmd get pods --namespace=$ns -o wide $@
+    res=$($kubectl_cmd get pods --namespace=$ns -o wide)
+    # Broken pipe annoyance
+    hdr=$(echo "$res" > /tmp/kc-pods && head -n 1 /tmp/kc-pods)
+    res=$(printf "$res" | grep -v NAME | sort)
+    echo "$hdr"; echo "$res"
 }
 
 function kc-nodes {
