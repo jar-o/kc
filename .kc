@@ -164,10 +164,15 @@ function kc-ingress {
     fi
     ns="$1"; shift
     if [ ! -z "$1" ]; then
-        $kubectl_cmd get ingress --namespace=$ns | grep -E "^NAME|$1"
+        $kubectl_cmd --namespace=$ns get ingress -o \
+            jsonpath='{range.items[*]}{"\n"}{.metadata.name}{"\t"}{range.spec.rules[*]}{.host}{"\t"}{end}{end}' | \
+            grep -E "$1"
+        echo
         return
     fi
-    $kubectl_cmd get ingress --namespace=$ns
+    $kubectl_cmd --namespace=$ns get ingress -o \
+        jsonpath='{range.items[*]}{"\n"}{.metadata.name}{"\t"}{range.spec.rules[*]}{.host}{"\t"}{end}{end}'
+    echo
 }
 
 function kc-shell {
