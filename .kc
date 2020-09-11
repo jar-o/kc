@@ -128,6 +128,33 @@ function kc-pods {
     echo "$hdr"; echo "$res"
 }
 
+# List pods in a namespace matching a pattern
+function kc-jobs {
+    if missing_params 1 $@; then
+        usage "<namespace> [pattern]" "mynamespace myservice"
+        return
+    fi
+    ns=$1
+    shift
+    if [ ! -z "$1" ]; then
+        # If the param starts with a hyphen, treat it as a kubectl option, not a
+        # pattern, and skip
+        if [[ ! "$1" =~ ^- ]]; then
+            pat=$1; shift
+            res=$($kubectl_cmd get jobs --namespace=$ns -o wide $@ | grep -E "^NAME|$pat")
+            hdr=$(echo "$res" | head -n 1)
+            res=$(echo "$res" | grep -v NAME | sort)
+            echo "$hdr"; echo "$res"
+            return
+        fi
+    fi
+    res=$($kubectl_cmd get jobs --namespace=$ns -o wide)
+    # Broken pipe annoyance
+    hdr=$(echo "$res" > /tmp/kc-pods && head -n 1 /tmp/kc-pods)
+    res=$(printf "$res" | grep -v NAME | sort)
+    echo "$hdr"; echo "$res"
+}
+
 function kc-nodes {
     if missing_params 1 $@; then
         usage "<namespace> [any other kubectl param]"
